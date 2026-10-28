@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "project_root": "..",
+  "phase2_zip": "assets/Brain-Imager_Phase-2_reproducibility_2026-10-28.zip",
+  "workspace": "workspace",
+  "nsd_access_agreement_confirmed": true,
+  "decoders": ["umbrae"],
+  "pilot_size": 20,
+  "selection_seed": 20261028,
+  "run_seed": 41021,
+  "repeats": 1,
+  "retrieval": {
+    "method": "sqlite_fts5_bm25",
+    "top_k": 3,
+    "context_token_budget": 240,
+    "tokenizer": "o200k_base",
+    "match_original_corrected_context_lengths": true
+  },
+  "model": {
+    "provider": "openai_chat_completions",
+    "model": "gpt-5.4-mini-2026-03-17",
+    "base_url": "https://api.openai.com/v1",
+    "api_key_env": "OPENAI_API_KEY",
+    "reasoning_effort": "none",
+    "max_completion_tokens": 256,
+    "timeout_seconds": 90,
+    "input_usd_per_million": 0.75,
+    "output_usd_per_million": 4.50,
+    "pricing_checked_date": "2026-10-28"
+  },
+  "limits": {
+    "max_pilot_stimuli": 50,
+    "max_api_attempts": 150,
+    "max_estimated_usd": 2.0,
+    "max_attempts_per_job": 2
+  }
+}

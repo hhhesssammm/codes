@@ -1,0 +1,180 @@
+{
+  "date": "2026-10-28",
+  "purpose": "Implementation and input checks, not experimental results",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "bits": 64,
+    "sqlite": "3.53.1",
+    "fts5_available": true,
+    "dependencies": {
+      "brain-imager-phase3": "0.1.0",
+      "httpx": "0.28.1",
+      "tiktoken": "0.12.0",
+      "Pillow": "12.3.0",
+      "pytest": "8.4.2"
+    },
+    "phase2_zip_exists": true,
+    "api_key_present": false,
+    "api_called": false,
+    "GPU_required": false,
+    "project_root": "/workspace/scratch/64f67ff623d5/brain_imager_phase3",
+    "workspace": "/workspace/scratch/64f67ff623d5/brain_imager_phase3/workspace"
+  },
+  "phase2": {
+    "status": "pass",
+    "sample_rows": 982,
+    "caption_rows": 2946,
+    "eligible_images": 122204,
+    "eligible_captions": 611349,
+    "excluded_images": 1083
+  },
+  "cached_captions": {
+    "status": "pass",
+    "caption_rows_verified": 2946
+  },
+  "index": {
+    "schema_version": 1,
+    "database_sha256": "42a4cdd11c551649e9c2bbaee2cd466957f892d1515150ab4aa3ab990182a60f",
+    "source_annotation_zip_sha256": "113a836d90195ee1f884e704da6304dfaaecff1f023f49b6ca93c4aaae470268",
+    "caption_count": 611349,
+    "image_count": 122204,
+    "excluded_images": 1083,
+    "retriever": "SQLite FTS5 BM25; porter unicode61; ascending score then caption_id",
+    "sqlite_version": "3.53.1",
+    "eligibility_files": {
+      "eligible_coco_image_ids.txt": "7c564113e7818fa85eab68d074ba5099fe272a655e3750c4d396d31706faee16",
+      "eligible_coco_caption_ids.txt": "aa2f82d55f2d963311f3b3ce56ab1cadef2a9425bed0098081817b819428d1b3",
+      "retrieval_exclusions.jsonl": "1db7b221588285652c426c1acca480aa2c467110fc4713d78a7eba94513202a2"
+    }
+  },
+  "official_crop_receipt_count": 20,
+  "new_visual_crop_review_performed": false,
+  "human_input_annotations_completed": 0,
+  "real_llm_requests": 0,
+  "real_plan_exists": false,
+  "real_model_outputs_exist": false,
+  "pytest": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "46",
+    "time": "1.797",
+    "timestamp": "2026-10-28T10:37:13.632726+03:30",
+    "hostname": "217f5ba6536b"
+  },
+  "missing_annotation_gate": {
+    "exit_code": 2,
+    "stderr": "STOP: Missing file: /workspace/scratch/64f67ff623d5/brain_imager_phase3/workspace/pilot/frozen_pre_annotations.json"
+  },
+  "windows_wheels": [
+    {
+      "file": "anyio-4.14.2-py3-none-any.whl",
+      "bytes": 125813,
+      "sha256": "9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494"
+    },
+    {
+      "file": "certifi-2026.10.23-py3-none-any.whl",
+      "bytes": 135082,
+      "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1"
+    },
+    {
+      "file": "charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl",
+      "bytes": 207486,
+      "sha256": "780fbe7cab297b81dad9fb8dc5eb003c0468ffb0d9e5f65068c53a34661a96bc"
+    },
+    {
+      "file": "colorama-0.4.6-py2.py3-none-any.whl",
+      "bytes": 25335,
+      "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+    },
+    {
+      "file": "h11-0.16.0-py3-none-any.whl",
+      "bytes": 37515,
+      "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"
+    },
+    {
+      "file": "httpcore-1.0.9-py3-none-any.whl",
+      "bytes": 78784,
+      "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55"
+    },
+    {
+      "file": "httpx-0.28.1-py3-none-any.whl",
+      "bytes": 73517,
+      "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"
+    },
+    {
+      "file": "idna-3.20-py3-none-any.whl",
+      "bytes": 69583,
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+    },
+    {
+      "file": "iniconfig-2.3.1-py3-none-any.whl",
+      "bytes": 7552,
+      "sha256": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7"
+    },
+    {
+      "file": "packaging-26.3-py3-none-any.whl",
+      "bytes": 129956,
+      "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+    },
+    {
+      "file": "pillow-12.3.0-cp312-cp312-win_amd64.whl",
+      "bytes": 7227137,
+      "sha256": "a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09"
+    },
+    {
+      "file": "pluggy-1.7.0-py3-none-any.whl",
+      "bytes": 27082,
+      "sha256": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec"
+    },
+    {
+      "file": "pygments-2.21.0-py3-none-any.whl",
+      "bytes": 1250147,
+      "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"
+    },
+    {
+      "file": "pytest-8.4.2-py3-none-any.whl",
+      "bytes": 365750,
+      "sha256": "872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79"
+    },
+    {
+      "file": "regex-2026.9.29-cp312-cp312-win_amd64.whl",
+      "bytes": 280334,
+      "sha256": "fdd88ed5e20b1bcdd234421e454962c971aa44b653bdb7f1ea9ef683e90fb649"
+    },
+    {
+      "file": "requests-2.34.2-py3-none-any.whl",
+      "bytes": 73075,
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+    },
+    {
+      "file": "setuptools-80.9.0-py3-none-any.whl",
+      "bytes": 1201486,
+      "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+    },
+    {
+      "file": "socksio-1.0.0-py3-none-any.whl",
+      "bytes": 12763,
+      "sha256": "95dc1f15f9b34e8d7b16f06d74b8ccf48f609af32ab33c608d08761c5dcbb1f3"
+    },
+    {
+      "file": "tiktoken-0.12.0-cp312-cp312-win_amd64.whl",
+      "bytes": 878694,
+      "sha256": "ffc5288f34a8bc02e1ea7047b8d041104791d2ddbf42d1e5fa07822cbffe16bd"
+    },
+    {
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "bytes": 45571,
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+    },
+    {
+      "file": "urllib3-2.8.0-py3-none-any.whl",
+      "bytes": 135717,
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+    }
+  ],
+  "native_windows_execution": false,
+  "live_api_transport_test": false
+}

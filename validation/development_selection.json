@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 3 exploratory pilot; not confirmatory",
+  "seed": 20261028,
+  "requested_size": 20,
+  "decoders": [
+    "umbrae"
+  ],
+  "coco_image_ids": [
+    191740,
+    354045,
+    38801,
+    174213,
+    477852,
+    323182,
+    186828,
+    58407,
+    246166,
+    281567,
+    150196,
+    151307,
+    377576,
+    221441,
+    336374,
+    268008,
+    539395,
+    372959,
+    330086,
+    106107
+  ],
+  "selection_rule": "SHA-256 order of whole Phase 2 similarity groups; no selection by caption errors or outputs",
+  "selection_sha256": "77c74d17834781174f82b2c2f3e5094eb114aa4dabf5bd1d428e665689ae0cf6"
+}
