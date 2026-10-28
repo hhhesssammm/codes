@@ -8,7 +8,7 @@ import sqlite3
 import zipfile
 from pathlib import Path
 from .assets import read_ids, validate_phase2
-from .common import load_json, load_jsonl, require, save_json, sha_file, digest
+from .common import load_json, load_jsonl, require, save_json, sha_file, sha_bytes, digest
 
 STOP = set("a an the is are was were be been being this that these those it its there and or of".split())
 
@@ -54,7 +54,7 @@ def build_index(cfg):
         conn.executemany("INSERT INTO documents VALUES (?,?,?)", batch)
         require(seen_ids == eligible_caps and seen_images == eligible, "Corpus build did not reproduce every approved eligible identity")
         conn.execute("INSERT INTO fts(fts) VALUES ('rebuild')")
-        conn.execute("INSERT INTO fts(fts) VALUES ('integrity-check')")
+        conn.execute("INSERT INTO fts(fts, rank) VALUES ('integrity-check', 1)")
         conn.commit()
         require(conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok", "SQLite integrity failure")
     finally:
@@ -69,16 +69,43 @@ def build_index(cfg):
     save_json(cfg.work / "corpus_manifest.json", manifest)
     return manifest
 
-def validate_index(cfg):
+def validate_against_annotation_zip(con, source, eligible_caption_ids):
+    actual = {cid: (iid, text) for cid, iid, text in con.execute("SELECT caption_id,image_id,text FROM documents")}
+    require(set(actual) == eligible_caption_ids, "Source audit caption identity mismatch")
+    with zipfile.ZipFile(source) as z:
+        for split in ("train2017", "val2017"):
+            for a in json.loads(z.read(f"annotations/captions_{split}.json"))["annotations"]:
+                if a["id"] in eligible_caption_ids:
+                    require(actual.pop(a["id"], None) == (a["image_id"], a["caption"]),
+                            "Indexed caption text/parent image differs from the pinned COCO source")
+    require(not actual, "Source audit missed indexed captions")
+
+def validate_index(cfg, deep=False):
     validate_phase2(cfg)
     m = load_json(cfg.work / "corpus_manifest.json")
     require(sha_file(cfg.work / "corpus.sqlite3") == m["database_sha256"], "Retrieval database changed after sealing")
+    expected_files = {"eligible_coco_image_ids.txt", "eligible_coco_caption_ids.txt", "retrieval_exclusions.jsonl"}
+    require(set(m["eligibility_files"]) == expected_files, "Index eligibility provenance is incomplete")
+    source = next(a for a in load_json(cfg.phase2 / "frozen_assets.json") if a["id"] == "coco_annotations")
+    require(m.get("source_annotation_zip_sha256") == source["sha256"], "Index annotation-source provenance differs from Phase 2")
     for name, h in m["eligibility_files"].items():
         require(sha_file(cfg.phase2 / "results" / name) == h, "Index used different eligibility files")
     with sqlite3.connect((cfg.work / "corpus.sqlite3").resolve().as_uri() + "?mode=ro", uri=True) as con:
-        n, images = con.execute("SELECT count(*), count(DISTINCT image_id) FROM documents").fetchone()
-    require((n, images) == (611349, 122204), "Indexed corpus counts differ from the approved pool")
-    return m
+        captions = {r[0] for r in con.execute("SELECT caption_id FROM documents")}
+        images = {r[0] for r in con.execute("SELECT DISTINCT image_id FROM documents")}
+        if deep:
+            archive = cfg.work / "downloads" / source["filename"]
+            require(sha_file(archive) == source["sha256"], "Deep source audit requires the hash-verified COCO annotation ZIP")
+            validate_against_annotation_zip(con, archive, read_ids(cfg.phase2 / "results/eligible_coco_caption_ids.txt"))
+            # Check external-content consistency on an in-memory copy; never mutate the sealed database.
+            with sqlite3.connect(":memory:") as check:
+                con.backup(check)
+                check.execute("INSERT INTO fts(fts,rank) VALUES ('integrity-check',1)")
+    require(captions == read_ids(cfg.phase2 / "results/eligible_coco_caption_ids.txt")
+            and images == read_ids(cfg.phase2 / "results/eligible_coco_image_ids.txt"),
+            "Indexed caption/image identities differ from the complete approved sets")
+    require((len(captions), len(images)) == (611349, 122204), "Indexed corpus counts differ from the approved pool")
+    return dict(m, deep_source_rows_verified=len(captions), fts_external_content_verified=True) if deep else m
 
 class Retriever:
     def __init__(self, db: Path, eligible_images: set[int], excluded_images: set[int]):
@@ -87,6 +114,7 @@ class Retriever:
         self.eligible = eligible_images
         self.excluded = excluded_images
         self.ids = [r[0] for r in self.conn.execute("SELECT caption_id FROM documents ORDER BY caption_id")]
+        self.last_search_stats = {}
 
     def close(self):
         self.conn.close()
@@ -94,21 +122,37 @@ class Retriever:
     def check(self, doc):
         require(doc["image_id"] in self.eligible and doc["image_id"] not in self.excluded, "Retrieval leakage detected")
 
+    @staticmethod
+    def metadata(doc):
+        # Metadata is never appended to FTS text or rendered in generator context.
+        return dict(doc, chunk_id=f"coco:caption:{doc['caption_id']}", retrieval_unit="whole_caption",
+                    source_caption_ids=[doc["caption_id"]],
+                    caption_utf8_sha256=sha_bytes(doc["text"].encode("utf-8")))
+
     def search(self, query: str, top_k: int) -> list[dict]:
+        require(type(top_k) is int and top_k > 0, "top_k must be a positive integer")
         q = match_query(query)
-        if not q:
+        self.last_search_stats = {"fts_query": q, "candidate_window": 0, "candidates_examined": 0, "expansions": 0, "returned": 0}
+        if not q or not self.ids:
             return []
-        rows = self.conn.execute("SELECT d.caption_id,d.image_id,d.text,bm25(fts) AS score FROM fts JOIN documents d ON d.caption_id=fts.rowid WHERE fts MATCH ? ORDER BY score ASC,d.caption_id ASC LIMIT ?", (q, max(100, top_k * 100)))
-        chosen = []; image_seen = set(); text_seen = set()
-        for r in rows:
-            doc = dict(r); self.check(doc)
-            norm = " ".join(doc["text"].lower().split())
-            if doc["image_id"] in image_seen or norm in text_seen:
-                continue
-            chosen.append(doc); image_seen.add(doc["image_id"]); text_seen.add(norm)
-            if len(chosen) == top_k:
-                break
-        return chosen
+        limit = min(len(self.ids), max(100, top_k * 100)); expansions = 0
+        while True:
+            rows = self.conn.execute("SELECT d.caption_id,d.image_id,d.text,bm25(fts) AS score FROM fts JOIN documents d ON d.caption_id=fts.rowid WHERE fts MATCH ? ORDER BY score ASC,d.caption_id ASC LIMIT ?", (q, limit)).fetchall()
+            chosen = []; image_seen = set(); text_seen = set(); examined = 0
+            for r in rows:
+                examined += 1
+                doc = dict(r); self.check(doc)
+                norm = " ".join(doc["text"].lower().split())
+                if doc["image_id"] in image_seen or norm in text_seen:
+                    continue
+                chosen.append(self.metadata(doc)); image_seen.add(doc["image_id"]); text_seen.add(norm)
+                if len(chosen) == top_k:
+                    break
+            self.last_search_stats = {"fts_query": q, "candidate_window": limit, "candidates_examined": examined,
+                                      "expansions": expansions, "returned": len(chosen)}
+            if len(chosen) == top_k or len(rows) < limit or limit == len(self.ids):
+                return chosen
+            limit = min(len(self.ids), limit * 2); expansions += 1
 
     def random_context(self, top_k, rng: random.Random, minimum_tokens, tokenizer):
         # Rejection sampling conditional on context length; no target truth enters here.
@@ -122,7 +166,7 @@ class Retriever:
                 norm = " ".join(doc["text"].lower().split())
                 if doc["image_id"] in images or norm in texts:
                     continue
-                doc["score"] = None; docs.append(doc); images.add(doc["image_id"]); texts.add(norm)
+                doc["score"] = None; docs.append(self.metadata(doc)); images.add(doc["image_id"]); texts.add(norm)
                 if len(docs) == top_k:
                     break
             if len(docs) == top_k and tokenizer.count(render_context(docs)[0]) >= minimum_tokens:

@@ -9,11 +9,33 @@ from .annotations import load_frozen_pre, validate_review
 from .common import digest, load_json, load_jsonl, require, save_json, save_jsonl, sha_file, stable_int, unique
 from .planning import load_plan
 
+def validate_outputs(plan, outputs):
+    """Bind every exported result to its immutable planned condition and identity."""
+    by_id = unique(outputs, "job_id")
+    jobs = unique(plan["jobs"], "job_id")
+    require(set(by_id) == set(jobs), "Output identities do not exactly cover the plan")
+    fields = ["row_id", "condition", "repeat", "subject", "decoder", "decoder_variant",
+              "coco_image_id", "nsd_id_zero_based", "sample_key", "cluster_id",
+              "request_key", "context_sha256", "original_caption_sha256"]
+    for jid, out in by_id.items():
+        job = jobs[jid]
+        require(all(out.get(k) == job[k] for k in fields)
+                and out.get("plan_sha256") == plan["plan_sha256"], "Output provenance differs from its planned identity/condition")
+        require(out.get("status") in {"not_run", "started", "failed", "completed"}, "Unknown generation status")
+        if out["status"] == "completed":
+            require(isinstance(out.get("caption"), str) and bool(out["caption"].strip())
+                    and out.get("output_sha256") == digest(out["caption"]), "Completed output caption/hash mismatch")
+            if job["condition"] == "decoded":
+                require(out["caption"] == job["source_caption"], "Unchanged baseline caption was altered")
+        else:
+            require(out.get("caption") is None and out.get("output_sha256") is None, "Incomplete generation must not contain a fallback caption")
+    return by_id
+
 def make_review(cfg, rater, allow_partial=False):
     require(rater and rater.replace("_", "").replace("-", "").isalnum(), "Use a simple rater ID")
     plan = load_plan(cfg); pre = unique(load_frozen_pre(cfg)["rows"], "row_id")
     outputs = load_jsonl(cfg.study / "outputs.jsonl")
-    require({r["job_id"] for r in outputs} == {j["job_id"] for j in plan["jobs"]}, "Outputs do not cover the planned jobs")
+    validate_outputs(plan, outputs)
     missing = [r for r in outputs if r["status"] != "completed"]
     require(allow_partial or not missing, "Generation is incomplete. Resume it, or use --allow-partial-review to explicitly record attrition.")
     tasks = []; keys = []; grouped = {}
@@ -53,10 +75,11 @@ def make_review(cfg, rater, allow_partial=False):
         save_jsonl(path, rows)
     return {"review_file": str(path), "tasks": len(tasks), "incomplete_generation_jobs": len(missing), "status": "human review required"}
 
-def validated_reviews(cfg, path):
+def validated_reviews(cfg, path, plan=None):
     receipt = load_json(cfg.study / "review_task_receipt.json")
     for name, key in [("review_tasks.jsonl", "tasks_sha256"), ("private/review_key.jsonl", "key_sha256"), ("outputs.jsonl", "source_outputs_sha256")]:
         require(sha_file(cfg.study / name) == receipt[key], f"Review source changed: {name}")
+    validate_outputs(plan or load_plan(cfg), load_jsonl(cfg.study / "outputs.jsonl"))
     tasks = unique(load_jsonl(cfg.study / "review_tasks.jsonl"), "blind_id")
     mapping = unique(load_jsonl(cfg.study / "private/review_key.jsonl"), "blind_id")
     pre = unique(load_frozen_pre(cfg)["rows"], "row_id")
@@ -81,6 +104,8 @@ def claim_metrics(review, pre):
         "focal_persistence_upper": None if focal is None else float(focal in {"persisted", "unverifiable"}),
         "focal_transition_unverifiable": None if focal is None else float(focal == "unverifiable"),
         "baseline_false_claims": len(false), "baseline_supported_claims": len(true),
+        "adjudicable_false_claims": len(false) - unknown,
+        "false_error_persistence": ratio(persisted, len(false) - unknown),
         "false_persistence_lower": ratio(persisted, len(false)),
         "false_persistence_upper": ratio(persisted + unknown, len(false)),
         "explicit_correction_rate": ratio(sum(transitions[c["claim_id"]] == "corrected" for c in false), len(false)),
@@ -105,6 +130,7 @@ def paired_contrast(rows, condition_a, condition_b, metric, seed, bootstrap=2000
     # B minus A, matched on exact row and repeat. Average repeats within each stimulus;
     # resample whole Phase 2 similarity groups. Never treat 3 decoder files as 3 subjects.
     by = {(r["row_id"], r["repeat"], r["condition"]): r for r in rows}
+    require(len(by) == len(rows), "Duplicate row/repeat/condition in paired analysis")
     row_deltas = collections.defaultdict(list); clusters = {}
     candidate_pairs = {(r["row_id"], r["repeat"]) for r in rows if r["condition"] in {condition_a, condition_b}}
     for rid, rep in sorted(candidate_pairs):
@@ -133,9 +159,32 @@ def paired_contrast(rows, condition_a, condition_b, metric, seed, bootstrap=2000
     result["ci95"] = [quantile(boot, .025), quantile(boot, .975)]
     return result
 
+def paired_persistence_bounds(rows, condition_a, condition_b, prefix):
+    """Identification bounds for B-A: [L_B-U_A, U_B-L_A], not a confidence interval."""
+    by = {(r["row_id"], r["repeat"], r["condition"]): r for r in rows}
+    require(len(by) == len(rows), "Duplicate row/repeat/condition in bound analysis")
+    paired = collections.defaultdict(list); clusters = set()
+    for rid, rep in sorted({(r["row_id"], r["repeat"]) for r in rows}):
+        a = by.get((rid, rep, condition_a)); b = by.get((rid, rep, condition_b))
+        if not a or not b:
+            continue
+        values = [a.get(prefix + "_lower"), a.get(prefix + "_upper"),
+                  b.get(prefix + "_lower"), b.get(prefix + "_upper")]
+        if any(v is None for v in values):
+            continue
+        la, ua, lb, ub = values
+        require(0 <= la <= ua <= 1 and 0 <= lb <= ub <= 1, "Invalid persistence bounds")
+        paired[rid].append((lb - ua, ub - la)); clusters.add(a["cluster_id"])
+    means = [(sum(v[0] for v in pairs) / len(pairs), sum(v[1] for v in pairs) / len(pairs)) for pairs in paired.values()]
+    return {"contrast": f"{condition_b} minus {condition_a}", "metric": prefix,
+            "paired_stimulus_rows": len(paired), "paired_replicates": sum(map(len, paired.values())),
+            "independent_similarity_clusters": len(clusters),
+            "identification_interval": [sum(v[i] for v in means) / len(means) for i in (0, 1)] if means else None,
+            "interpretation": "Worst-case bounds for unresolved transitions; not a sampling confidence interval"}
+
 def evaluate(cfg, review_path, bootstrap=2000):
     require(100 <= bootstrap <= 10000, "Use 100–10000 bootstrap replicates")
-    plan = load_plan(cfg); reviews, mapping, pre = validated_reviews(cfg, review_path)
+    plan = load_plan(cfg); reviews, mapping, pre = validated_reviews(cfg, review_path, plan)
     outputs = unique(load_jsonl(cfg.study / "outputs.jsonl"), "job_id")
     rows = []; baseline_issues = []
     for bid, review in reviews.items():
@@ -172,16 +221,20 @@ def evaluate(cfg, review_path, bootstrap=2000):
                 entry["metrics"][metric] = {"mean_over_stimuli": sum(vals) / len(vals) if vals else None, "stimuli_with_defined_metric": len(vals)}
             per_condition.append(entry)
     contrasts = []
-    pairs = [("rewrite_only", "rag_original"), ("rag_original", "rag_query_repaired"),
+    pairs = [("decoded", "rewrite_only"), ("rewrite_only", "rag_original"), ("rag_original", "rag_query_repaired"),
              ("rag_original", "random_context"), ("rag_original", "rag_caption_repaired"),
-             ("rag_query_repaired", "rag_both_repaired")]
-    contrast_metrics = ["focal_error_persistence", "focal_persistence_lower", "focal_persistence_upper",
-                        "false_persistence_lower", "explicit_correction_rate", "false_claim_omission_rate",
+             ("rag_query_repaired", "rag_both_repaired"), ("rag_caption_repaired", "rag_both_repaired")]
+    contrast_metrics = ["focal_error_persistence", "false_error_persistence",
+                        "explicit_correction_rate", "false_claim_omission_rate",
                         "correct_claim_retention", "new_false_claims", "new_unverifiable_claims", "output_word_count"]
+    bounds = []
     for decoder in cfg.raw["decoders"]:
         for a, b in pairs:
+            subset = [r for r in rows if r["decoder"] == decoder]
+            for prefix in ("focal_persistence", "false_persistence"):
+                bounds.append(dict(paired_persistence_bounds(subset, a, b, prefix), decoder=decoder))
             for metric in contrast_metrics:
-                result = paired_contrast([r for r in rows if r["decoder"] == decoder], a, b, metric,
+                result = paired_contrast(subset, a, b, metric,
                                          stable_int(cfg.raw["run_seed"], decoder, a, b, metric), bootstrap)
                 contrasts.append(dict(result, decoder=decoder))
     report = {"scope": "Phase 3 pilot only; no scientific conclusion is generated", "plan_sha256": plan["plan_sha256"],
@@ -189,7 +242,7 @@ def evaluate(cfg, review_path, bootstrap=2000):
               "planned_outputs": len(plan["jobs"]), "reviewed_outputs": len(rows),
               "generation_status_counts": dict(collections.Counter(o["status"] for o in outputs.values())),
               "diagnostic_focal_error_rows": sum(a["diagnostic_eligible"] for a in pre.values()),
-              "per_condition": per_condition, "paired_contrasts": contrasts,
+              "per_condition": per_condition, "paired_contrasts": contrasts, "paired_persistence_bounds": bounds,
               "warnings": ["Single-subject cached benchmark", "Oracle repairs use privileged visual information",
                            "Unverifiable claims are not automatically false", "Omission is distinct from explicit correction",
                            "Intervals are exploratory; complete-case comparisons can be affected by attrition",
@@ -202,7 +255,8 @@ def evaluate(cfg, review_path, bootstrap=2000):
     return {"summary": str(outdir / "pilot_summary.json"), "reviewed_outputs": len(rows), "diagnostic_focal_error_rows": report["diagnostic_focal_error_rows"]}
 
 def compare_reviewers(cfg, path_a, path_b):
-    a, _, _ = validated_reviews(cfg, path_a); b, _, _ = validated_reviews(cfg, path_b)
+    plan = load_plan(cfg)
+    a, _, _ = validated_reviews(cfg, path_a, plan); b, _, _ = validated_reviews(cfg, path_b, plan)
     require(set(a) == set(b), "Rater task sets differ")
     labels_a = []; labels_b = []; disagreements = []
     for bid in sorted(a):

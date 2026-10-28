@@ -1,0 +1,20 @@
+{
+  "python": "3.12.14",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "bits": 64,
+  "sqlite": "3.53.1",
+  "fts5_available": true,
+  "dependencies": {
+    "brain-imager-phase3": "0.1.1",
+    "httpx": "0.28.1",
+    "tiktoken": "0.12.0",
+    "Pillow": "12.3.0",
+    "pytest": "8.4.2"
+  },
+  "phase2_zip_exists": true,
+  "api_key_present": false,
+  "api_called": false,
+  "GPU_required": false,
+  "project_root": "/workspace/scratch/64f67ff623d5/codes_review",
+  "workspace": "/workspace/scratch/64f67ff623d5/brain_imager_phase3/workspace"
+}

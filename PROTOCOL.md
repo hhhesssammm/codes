@@ -75,11 +75,13 @@ identical normalized caption text within the selected top-k examples. A query
 returns fewer examples if too few distinct matches exist; it does not invent
 or silently replace missing results.
 
-The distinct-donor selection scans a fixed candidate window of
-`max(100, 100 * top_k)` ranked caption matches (300 at the default top-k of 3).
-Thus a rare query with many duplicate matches in that window can yield fewer
-than top-k examples even if more distinct donors exist further down the ranking.
-This finite candidate policy is fixed across both query variants.
+Distinct-donor selection begins with `max(100, 100 * top_k)` ranked caption
+matches, then deterministically doubles that window when duplicate images or
+caption texts would otherwise hide valid lower-ranked donors. Expansion stops
+at top-k distinct results or exhausted matches. Both query variants use the
+same policy and log their normalized query, window and expansion count.
+Administrative chunk IDs, source-caption IDs and text hashes are stored as
+metadata; they are neither indexed as text nor sent to the generator.
 
 BM25 is a practical, reproducible CPU baseline. This implementation does not
 establish behavior of dense-embedding or brain-feature retrieval. Generalizing
@@ -93,6 +95,10 @@ is the effect of the context actually supplied, including this frozen budget
 policy. Zero-hit and unchanged-context cases are explicit diagnostics. Do not
 post-select only cases where the intervention changed retrieval to estimate an
 unconditional effect; a changed-context subgroup must be labelled secondary.
+
+The review update explicitly counts partially displayed captions and retrieved
+captions with no displayed text. The existing exact token-matching policy is
+preserved; its possible loss of complete relations remains a limitation.
 
 No target image, target reference caption, human label, NSD/COCO identity or
 repair rationale enters the API request. The repaired query itself is not sent
@@ -145,6 +151,12 @@ Unverifiable transitions are also reported and contribute to lower/upper
 persistence bounds; they are not silently counted as successful correction.
 All-false-claim persistence bounds retain the baseline false-claim denominator.
 Correct-claim retention and new false claims are mandatory companion outcomes.
+The all-false-claim point estimate additionally reports its adjudicable claim
+denominator. For paired condition differences, identification bounds use
+`[lower_B - upper_A, upper_B - lower_A]`. These bounds quantify unresolved
+transitions and are distinct from bootstrap confidence intervals for the
+adjudicable point estimates. Subtracting two lower endpoints is not labelled
+as a lower bound on the difference.
 
 Outputs are blinded to condition and decoder in the local review interface.
 Transition assessment necessarily exposes fixed baseline claims and their
@@ -190,3 +202,21 @@ an unbiased full-pilot effect by omission of failures.
 The Phase 3 deliverable is a runnable and audited pilot workflow plus its later
 observations when you execute it. A confirmatory sample, statistical claims of
 generality, and manuscript conclusions require a separate review.
+
+## Offline retrieval representation diagnostic
+
+The review command `retrieval-audit` samples eligible donor images, withholds
+one caption per selected query image, and removes all whole-caption normalized
+duplicates of those query texts before indexing. The remaining same-image
+captions define one positive parent image for each query. This diagnostic never
+uses NSD target references as queries, never reintroduces excluded images and
+never calls a generation model. Source caption IDs and character spans stay
+within one image in every representation.
+
+It measures image-level Hits@1/3/10 and reciprocal rank, plus index size, runtime
+and raw top-3 context length. The query/candidate pool, tokenizer, BM25 query,
+ranking tie-breaks and image/text deduplication are shared across representations.
+The longer text supplied by image bundles is explicitly reported. This is a
+caption-to-caption retrieval proxy, not a controlled generation comparison or
+evidence about persistent brain-decoding errors. Alternative representations
+remain outside the production seven-condition runner pending review.

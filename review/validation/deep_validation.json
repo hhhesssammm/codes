@@ -1,0 +1,32 @@
+{
+  "phase2": {
+    "status": "pass",
+    "sample_rows": 982,
+    "caption_rows": 2946,
+    "eligible_images": 122204,
+    "eligible_captions": 611349,
+    "excluded_images": 1083
+  },
+  "captions": {
+    "status": "pass",
+    "caption_rows_verified": 2946
+  },
+  "index": {
+    "schema_version": 1,
+    "database_sha256": "42a4cdd11c551649e9c2bbaee2cd466957f892d1515150ab4aa3ab990182a60f",
+    "source_annotation_zip_sha256": "113a836d90195ee1f884e704da6304dfaaecff1f023f49b6ca93c4aaae470268",
+    "caption_count": 611349,
+    "image_count": 122204,
+    "excluded_images": 1083,
+    "retriever": "SQLite FTS5 BM25; porter unicode61; ascending score then caption_id",
+    "sqlite_version": "3.53.1",
+    "eligibility_files": {
+      "eligible_coco_image_ids.txt": "7c564113e7818fa85eab68d074ba5099fe272a655e3750c4d396d31706faee16",
+      "eligible_coco_caption_ids.txt": "aa2f82d55f2d963311f3b3ce56ab1cadef2a9425bed0098081817b819428d1b3",
+      "retrieval_exclusions.jsonl": "1db7b221588285652c426c1acca480aa2c467110fc4713d78a7eba94513202a2"
+    },
+    "deep_source_rows_verified": 611349,
+    "fts_external_content_verified": true
+  },
+  "official_crops_verified": 20
+}

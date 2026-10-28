@@ -1,5 +1,10 @@
 # Phase 3 execution guide for a Windows laptop
 
+For the repository review update to version **0.1.1**, first follow
+`review\LAPTOP_UPDATE.md`. The ZIP setup below describes the original delivered
+package. Preserve any old frozen plans and outputs before applying the update;
+the changed code digest intentionally prevents resuming them under new code.
+
 This guide runs only the exploratory Phase 3 pilot. It does not train a decoder,
 run a confirmatory study, or write scientific conclusions. Real experimental
 generation has **not** been performed in the delivered project.
@@ -8,8 +13,9 @@ generation has **not** been performed in the delivered project.
 
 - Windows 10/11, 64-bit Python **3.12** and PowerShell. Python 3.13 is also allowed
   by the package; the local verification used Python 3.12 on Linux. A native
-  Windows execution has not been claimed. Windows CPython 3.12 dependency wheels
-  were checked, and a Windows/Linux CI configuration is included.
+  Windows execution of the review patch has not been claimed. The original
+  repository commit passed Windows/Linux CI on Python 3.12 and 3.13; see the
+  separate review report for the exact run and scope of this evidence.
 - A normal CPU. **No GPU, CUDA, PyTorch, fMRI beta volumes or model training is
   required.** An 8 GB RAM laptop is a practical recommendation, not a measured
   minimum. Allow roughly 2 GB free disk space for the environment, metadata,
@@ -111,6 +117,7 @@ After selection/planning, do not change settings in the same workspace.
 & $Py -m brain_imager_phase3 --config $Cfg fetch --what crops
 & $Py -m brain_imager_phase3 --config $Cfg index
 & $Py -m brain_imager_phase3 --config $Cfg validate
+& $Py -m brain_imager_phase3 --config $Cfg validate --deep
 ```
 
 Expected checks: 2,946 verified caption rows, 982 original sample identities,
@@ -227,6 +234,7 @@ The default model is a pinned snapshot, not an alias. If unavailable, the progra
 stops. Do not silently substitute a different model mid-run. Choose an available
 model deliberately, verify its supported parameters/pricing, and freeze a new
 pilot configuration; this release was documented for the default provider.
+The returned model identifier must match the configured snapshot exactly.
 
 ## 8. Configure your API key and explicitly execute
 

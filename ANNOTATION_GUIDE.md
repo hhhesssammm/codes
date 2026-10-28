@@ -57,6 +57,14 @@ Every output claim has an origin:
   attempted correction as contradicted. It counts as a newly introduced error.
 - `new`: a claim not linked to a baseline assertion. Leave the baseline link empty.
 
+For an initially false claim, use `baseline` when the original false proposition
+is still asserted; use `correction` for a proposed factual replacement. A false
+replacement is still labelled contradicted. If the original false claim remains
+alongside a supported replacement, score the original error as `persisted` and
+record both output claims. A claim listed as present in the inventory cannot
+simultaneously be scored as omitted. The validator rejects these contradictory
+records; it still cannot certify that the underlying visual judgment is right.
+
 For a baseline **contradicted** claim:
 
 | Transition | Meaning |

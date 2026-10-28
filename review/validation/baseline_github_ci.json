@@ -1,0 +1,192 @@
+{
+  "observed_date": "2026-10-28",
+  "scope": "Baseline commit only; not CI for this patch",
+  "base_commit": "b9cc9aa00a6f7e4787d30f2fbcbd43af95edc9bc",
+  "run_url": "https://github.com/hhhesssammm/codes/actions/runs/40652671109",
+  "jobs": [
+    {
+      "name": "test (windows-latest, 3.12)",
+      "head_sha": "b9cc9aa00a6f7e4787d30f2fbcbd43af95edc9bc",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/hhhesssammm/codes/actions/runs/40652671109/job/122696197648",
+      "completed_at": "2026-10-28T07:51:55Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -r requirements-lock.txt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -e . --no-deps --no-build-isolation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pytest -q",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "test (ubuntu-latest, 3.12)",
+      "head_sha": "b9cc9aa00a6f7e4787d30f2fbcbd43af95edc9bc",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/hhhesssammm/codes/actions/runs/40652671109/job/122696198051",
+      "completed_at": "2026-10-28T07:50:50Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -r requirements-lock.txt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -e . --no-deps --no-build-isolation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pytest -q",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "test (ubuntu-latest, 3.13)",
+      "head_sha": "b9cc9aa00a6f7e4787d30f2fbcbd43af95edc9bc",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/hhhesssammm/codes/actions/runs/40652671109/job/122696198095",
+      "completed_at": "2026-10-28T07:50:48Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -r requirements-lock.txt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -e . --no-deps --no-build-isolation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pytest -q",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "test (windows-latest, 3.13)",
+      "head_sha": "b9cc9aa00a6f7e4787d30f2fbcbd43af95edc9bc",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/hhhesssammm/codes/actions/runs/40652671109/job/122696198124",
+      "completed_at": "2026-10-28T07:51:10Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -r requirements-lock.txt",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pip install -e . --no-deps --no-build-isolation",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run python -m pytest -q",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}

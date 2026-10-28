@@ -31,8 +31,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Brain-Imager Phase 3 pilot. Generation is opt-in and human annotations are required.")
     parser.add_argument("--config", default="config/pilot.json", help="JSON config; relative asset paths resolve from project_root")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ["doctor", "init", "validate", "pilot", "index", "plan"]:
+    for name in ["doctor", "init", "pilot", "index", "plan"]:
         sub.add_parser(name)
+    validation = sub.add_parser("validate")
+    validation.add_argument("--deep", action="store_true", help="Also compare every indexed caption and parent to the pinned source and check FTS consistency")
     fetch = sub.add_parser("fetch"); fetch.add_argument("--what", choices=["captions", "coco", "crops", "all"], required=True)
     pre = sub.add_parser("make-pre"); pre.add_argument("--rater", default="R1")
     freeze = sub.add_parser("freeze-inputs"); freeze.add_argument("--annotations", required=True)
@@ -44,6 +46,11 @@ def main(argv=None):
     review = sub.add_parser("make-review"); review.add_argument("--rater", default="R1"); review.add_argument("--allow-partial-review", action="store_true")
     ev = sub.add_parser("evaluate"); ev.add_argument("--review", required=True); ev.add_argument("--bootstrap", type=int, default=2000)
     compare = sub.add_parser("compare-raters"); compare.add_argument("--a", required=True); compare.add_argument("--b", required=True)
+    audit = sub.add_parser("retrieval-audit", help="CPU-only held-out donor-caption diagnostic; no generation")
+    audit.add_argument("--candidate-images", type=int, default=10000)
+    audit.add_argument("--queries", type=int, default=100)
+    audit.add_argument("--seed", type=int, default=20261028)
+    audit.add_argument("--output", help="New/empty output directory; default workspace/retrieval_audit")
     args = parser.parse_args(argv)
     try:
         cfg = load_config(args.config)
@@ -52,7 +59,8 @@ def main(argv=None):
         elif args.command == "init": result = assets.initialize(cfg)
         elif args.command == "validate":
             result = {"phase2": assets.validate_phase2(cfg), "captions": assets.validate_captions(cfg)}
-            if (cfg.work / "corpus.sqlite3").exists(): result["index"] = retrieval.validate_index(cfg)
+            if args.deep: require((cfg.work / "corpus.sqlite3").exists(), "Build the retrieval index before deep validation")
+            if (cfg.work / "corpus.sqlite3").exists(): result["index"] = retrieval.validate_index(cfg, deep=args.deep)
             if (cfg.study / "crop_receipts.json").exists(): result["official_crops_verified"] = len(annotations.crop_registry(cfg))
         elif args.command == "fetch":
             result = {}
@@ -76,6 +84,10 @@ def main(argv=None):
         elif args.command == "make-review": result = evaluation.make_review(cfg, args.rater, args.allow_partial_review)
         elif args.command == "evaluate": result = evaluation.evaluate(cfg, Path(args.review).resolve(), args.bootstrap)
         elif args.command == "compare-raters": result = evaluation.compare_reviewers(cfg, Path(args.a).resolve(), Path(args.b).resolve())
+        elif args.command == "retrieval-audit":
+            from .retrieval_audit import run_audit
+            result = run_audit(cfg, Path(args.output) if args.output else cfg.work / "retrieval_audit",
+                               args.candidate_images, args.queries, args.seed)
         else: raise AuditError("Unknown command")
         print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))
         return 0

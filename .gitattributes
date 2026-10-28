@@ -1,0 +1,4 @@
+# Preserve byte-identical source checksums on Windows as well as Linux.
+* text=auto eol=lf
+*.zip -text
+assets/tokenizer_cache/* -text

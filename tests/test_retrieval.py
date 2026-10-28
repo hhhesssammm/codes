@@ -43,3 +43,19 @@ def test_unicode_clipping_never_introduces_replacement_characters(tmp_path):
         assert "\ufffd" not in clipped and text.startswith(clipped) and t.count(clipped) <= limit
     a,b = t.matched([text, 'A very long image caption about a bicycle and a forest.'], 9)
     assert t.count(a) == t.count(b)
+
+def test_retrieval_metadata_does_not_enter_generator_context(tiny_db):
+    r=Retriever(tiny_db,{101,102,103,104,105},set())
+    try:
+        docs=r.search('red cat',2);text=render_context(docs)[0]
+        assert all(d['retrieval_unit']=='whole_caption' and d['source_caption_ids']==[d['caption_id']] for d in docs)
+        assert 'coco:caption:' not in text and 'sha256' not in text
+        assert r.last_search_stats['returned']==len(docs)
+    finally:r.close()
+
+def test_partial_displayed_caption_is_explicitly_logged(tmp_path):
+    from brain_imager_phase3.planning import context_record
+    tok=Tokenizer(cache_dir=tmp_path/'tokens')
+    docs=[{'caption_id':1,'image_id':10,'text':'A cat beside a window.'}]
+    result=context_record(docs,'Example 1: A cat',tok)
+    assert result['partial_caption_count']==1 and result['displayed_documents'][0]['fully_displayed'] is False

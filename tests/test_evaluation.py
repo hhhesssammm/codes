@@ -1,6 +1,6 @@
 import copy
 import pytest
-from brain_imager_phase3.evaluation import claim_metrics, paired_contrast
+from brain_imager_phase3.evaluation import claim_metrics, paired_contrast, paired_persistence_bounds
 from brain_imager_phase3.annotations import validate_review
 from brain_imager_phase3.common import AuditError
 
@@ -39,3 +39,18 @@ def test_cluster_bootstrap_does_not_count_repeats_as_stimuli():
 def test_no_eligible_errors_returns_null_not_zero_effect():
     result=paired_contrast([{'row_id':'a','repeat':0,'condition':'a','cluster_id':1,'m':None}], 'a','b','m',1,100)
     assert result['mean_difference'] is None and result['paired_stimulus_rows']==0
+
+def test_unknown_in_both_cells_has_full_difference_bounds():
+    rows=[{'row_id':'x','repeat':0,'condition':c,'cluster_id':1,'focal_persistence_lower':0,'focal_persistence_upper':1} for c in ('a','b')]
+    result=paired_persistence_bounds(rows,'a','b','focal_persistence')
+    assert result['identification_interval']==[-1,1]
+    assert result['paired_stimulus_rows']==1
+
+def test_exact_transitions_have_exact_difference_bounds():
+    rows=[{'row_id':'x','repeat':0,'condition':c,'cluster_id':1,'focal_persistence_lower':v,'focal_persistence_upper':v} for c,v in [('a',1),('b',0)]]
+    assert paired_persistence_bounds(rows,'a','b','focal_persistence')['identification_interval']==[-1,-1]
+
+def test_duplicate_analysis_rows_are_not_silently_overwritten():
+    row={'row_id':'x','repeat':0,'condition':'a','cluster_id':1,'metric':1}
+    with pytest.raises(AuditError,match='Duplicate'):
+        paired_contrast([row,row],'a','b','metric',42,100)

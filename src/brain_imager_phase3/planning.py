@@ -21,7 +21,7 @@ CONDITIONS = {
 
 def source_code_hash():
     root = Path(__file__).parent
-    return digest({p.name: sha_file(p) for p in sorted(root.glob("*.py"))})
+    return digest({p.name: sha_file(p) for p in sorted(root.iterdir()) if p.suffix in {".py", ".html"}})
 
 def cost_reservation(body, model):
     # UTF-8 bytes plus overhead intentionally overestimates normal text input tokens.
@@ -38,10 +38,12 @@ def context_record(docs, text, tokenizer):
     for s in spans:
         excerpt = text[s["start"]:min(s["end"], len(text))]
         if excerpt:
-            visible.append(dict(s, displayed_excerpt=excerpt))
+            visible.append(dict(s, displayed_excerpt=excerpt, fully_displayed=len(excerpt) == s["end"] - s["start"]))
     return {"retrieved_documents": docs, "displayed_documents": visible,
             "context_text": text, "context_sha256": digest(text), "context_tokens": tokenizer.count(text),
-            "unclipped_context_tokens": tokenizer.count(original), "truncated": text != original}
+            "unclipped_context_tokens": tokenizer.count(original), "truncated": text != original,
+            "partial_caption_count": sum(not d["fully_displayed"] for d in visible),
+            "retrieved_but_not_displayed": len(docs) - len(visible)}
 
 def create_plan(cfg):
     pre = load_frozen_pre(cfg); index = validate_index(cfg)
@@ -57,7 +59,9 @@ def create_plan(cfg):
         for row in pilot_rows(cfg):
             rid = row["manifest_row_id"]; a = ann[rid]; c0 = row["caption"]; c1 = a["repaired_query"]
             raw_docs = retriever.search(c0, settings["top_k"])
+            raw_search = dict(retriever.last_search_stats)
             fixed_docs = retriever.search(c1, settings["top_k"]) if a["diagnostic_eligible"] else raw_docs
+            fixed_search = dict(retriever.last_search_stats) if a["diagnostic_eligible"] else dict(raw_search)
             raw_text = render_context(raw_docs)[0]; fixed_text = render_context(fixed_docs)[0]
             both_nonempty = bool(raw_text and fixed_text)
             if settings["match_original_corrected_context_lengths"] and both_nonempty:
@@ -67,11 +71,14 @@ def create_plan(cfg):
                 fixed_text = tokenizer.clip(fixed_text, settings["context_token_budget"])
             raw_context = context_record(raw_docs, raw_text, tokenizer)
             fixed_context = context_record(fixed_docs, fixed_text, tokenizer)
+            raw_context["search"] = raw_search; fixed_context["search"] = fixed_search
             raw_set = {d["image_id"] for d in raw_docs}; fixed_set = {d["image_id"] for d in fixed_docs}
             diagnostics.append({"row_id": rid, "diagnostic_eligible": a["diagnostic_eligible"],
                 "retrieved_image_jaccard": len(raw_set & fixed_set) / len(raw_set | fixed_set) if raw_set | fixed_set else None,
                 "context_changed": raw_text != fixed_text, "matched_context_lengths": tokenizer.count(raw_text) == tokenizer.count(fixed_text),
                 "original_zero_hits": not raw_docs, "repaired_zero_hits": not fixed_docs,
+                "original_partial_captions": raw_context["partial_caption_count"],
+                "repaired_partial_captions": fixed_context["partial_caption_count"],
                 "original_tokens": tokenizer.count(raw_text), "repaired_tokens": tokenizer.count(fixed_text)})
             for name, query, context in [("original", c0, raw_context), ("repaired", c1, fixed_context)]:
                 contexts.append(dict(context, row_id=rid, query_variant=name, query=query, repeat=None))

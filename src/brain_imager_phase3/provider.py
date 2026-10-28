@@ -68,6 +68,8 @@ class OpenAIProvider:
         except ValueError as exc:
             raise ProviderFailure("non_json_http_response") from exc
         result = parse_response(raw)
+        if result["returned_model"] != body["model"]:
+            raise ProviderFailure("unexpected_returned_model", raw=raw)
         result["http_request_id"] = r.headers.get("x-request-id")
         return result
 

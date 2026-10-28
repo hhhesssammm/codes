@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="7" time="0.467" timestamp="2026-10-28T12:35:48.533471+03:30" hostname="2a2439b4bbfe"><testcase classname="tests.test_audit_regressions" name="test_crop_receipt_cannot_swap_stimulus_identity" time="0.003"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;">tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-1/test_crop_receipt_cannot_swap_0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7fc5f91c8b00&gt;
+
+    def test_crop_receipt_cannot_swap_stimulus_identity(tmp_path, monkeypatch):
+        cfg = SimpleNamespace(study=tmp_path/'pilot', work=tmp_path, phase2=tmp_path/'phase2')
+        (tmp_path/'crops').mkdir()
+        for name, data in [('one.png', b'synthetic-one'), ('two.png', b'synthetic-two')]:
+            (tmp_path/'crops'/name).write_bytes(data)
+        samples = [{'coco_image_id': 1, 'nsd_id_zero_based': 10, 'official_png_name': 'one.png', 'official_png_url': 'https://example.invalid/one.png'},
+                   {'coco_image_id': 2, 'nsd_id_zero_based': 20, 'official_png_name': 'two.png', 'official_png_url': 'https://example.invalid/two.png'}]
+        save_jsonl(cfg.phase2/'results/sample_manifest.jsonl', samples)
+        save_json(cfg.phase2/'results/crop_checks.json', {'checks': []})
+        # Both byte hashes are correct, but the first image is assigned the second crop.
+        save_json(cfg.study/'crop_receipts.json', [
+            {'coco_image_id': 1, 'nsd_id_zero_based': 20, 'filename': 'two.png', 'url': 'https://example.invalid/two.png', 'sha256': sha_bytes(b'synthetic-two')},
+            {'coco_image_id': 2, 'nsd_id_zero_based': 10, 'filename': 'one.png', 'url': 'https://example.invalid/one.png', 'sha256': sha_bytes(b'synthetic-one')}])
+        monkeypatch.setattr(annotations, 'load_selection', lambda c: {'coco_image_ids': [1, 2]})
+&gt;       with pytest.raises(AuditError, match='identity|provenance'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;
+
+tests/test_audit_regressions.py:25: Failed</failure></testcase><testcase classname="tests.test_audit_regressions" name="test_duplicate_candidate_window_does_not_hide_distinct_donors" time="0.004"><failure message="AssertionError: assert 1 == 3&#10; +  where 1 = len([{'caption_id': 1, 'image_id': 1, 'score': -1.0060375670840788e-06, 'text': 'cat'}])">tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-1/test_duplicate_candidate_windo0')
+
+    def test_duplicate_candidate_window_does_not_hide_distinct_donors(tmp_path):
+        db=tmp_path/'duplicates.sqlite3'
+        with sqlite3.connect(db) as c:
+            c.execute('CREATE TABLE documents(caption_id INTEGER PRIMARY KEY, image_id INTEGER, text TEXT)')
+            rows=[(i, i, 'cat') for i in range(1, 402)] + [(402, 402, 'cat beside a window'), (403, 403, 'cat on a wall')]
+            c.executemany('INSERT INTO documents VALUES (?,?,?)', rows)
+            c.execute("CREATE VIRTUAL TABLE fts USING fts5(text,content='documents',content_rowid='caption_id',tokenize='porter unicode61')")
+            c.execute("INSERT INTO fts(fts) VALUES ('rebuild')")
+        r=Retriever(db, set(range(1,404)), set())
+        try:
+            docs=r.search('cat', 3)
+&gt;           assert len(docs)==3
+E           AssertionError: assert 1 == 3
+E            +  where 1 = len([{'caption_id': 1, 'image_id': 1, 'score': -1.0060375670840788e-06, 'text': 'cat'}])
+
+tests/test_audit_regressions.py:40: AssertionError</failure></testcase><testcase classname="tests.test_audit_regressions" name="test_persistent_error_cannot_be_scored_as_removed[omitted]" time="0.001"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;">pre_example = ({'caption': 'A red cat sits.', 'caption_utf8_sha256': '72ee72a1805d97a7c6ac9aa6d4279ff94d6acbc96864bbf43140e42ab73dc0...ind': 'attribute', ...}, {'claim_id': 'c2', 'end': 9, 'evidence': 'SYNTHETIC TEST ONLY', 'kind': 'object', ...}], ...})
+status = 'omitted'
+
+    @pytest.mark.parametrize('status', ['omitted', 'corrected'])
+    def test_persistent_error_cannot_be_scored_as_removed(pre_example, status):
+        row,crop,pre=pre_example
+        task={'blind_id':'synthetic', 'caption':row['caption'], 'output_sha256':digest(row['caption']),
+              'crop_filename':crop['filename'], 'crop_sha256':crop['sha256']}
+        review=dict(task, annotator_id='SYNTHETIC', review_complete=True, claims_complete=True, caption_usable=True,
+            transitions=[{'baseline_claim_id':'c1','status':status,'evidence':'SYNTHETIC'},
+                         {'baseline_claim_id':'c2','status':'retained','evidence':'SYNTHETIC'}],
+            output_claims=[{'claim_id':'o1','text':'red cat','label':'contradicted','kind':'attribute','origin':'baseline','baseline_claim_id':'c1','evidence':'SYNTHETIC'},
+                           {'claim_id':'o2','text':'cat','label':'supported','kind':'object','origin':'baseline','baseline_claim_id':'c2','evidence':'SYNTHETIC'}])
+        if status=='corrected':
+            review['output_claims'].append({'claim_id':'o3','text':'blue cat','label':'supported','kind':'attribute','origin':'correction','baseline_claim_id':'c1','evidence':'SYNTHETIC'})
+&gt;       with pytest.raises(AuditError, match='persist|inventory|contradict'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;
+
+tests/test_audit_regressions.py:57: Failed</failure></testcase><testcase classname="tests.test_audit_regressions" name="test_persistent_error_cannot_be_scored_as_removed[corrected]" time="0.000"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;">pre_example = ({'caption': 'A red cat sits.', 'caption_utf8_sha256': '72ee72a1805d97a7c6ac9aa6d4279ff94d6acbc96864bbf43140e42ab73dc0...ind': 'attribute', ...}, {'claim_id': 'c2', 'end': 9, 'evidence': 'SYNTHETIC TEST ONLY', 'kind': 'object', ...}], ...})
+status = 'corrected'
+
+    @pytest.mark.parametrize('status', ['omitted', 'corrected'])
+    def test_persistent_error_cannot_be_scored_as_removed(pre_example, status):
+        row,crop,pre=pre_example
+        task={'blind_id':'synthetic', 'caption':row['caption'], 'output_sha256':digest(row['caption']),
+              'crop_filename':crop['filename'], 'crop_sha256':crop['sha256']}
+        review=dict(task, annotator_id='SYNTHETIC', review_complete=True, claims_complete=True, caption_usable=True,
+            transitions=[{'baseline_claim_id':'c1','status':status,'evidence':'SYNTHETIC'},
+                         {'baseline_claim_id':'c2','status':'retained','evidence':'SYNTHETIC'}],
+            output_claims=[{'claim_id':'o1','text':'red cat','label':'contradicted','kind':'attribute','origin':'baseline','baseline_claim_id':'c1','evidence':'SYNTHETIC'},
+                           {'claim_id':'o2','text':'cat','label':'supported','kind':'object','origin':'baseline','baseline_claim_id':'c2','evidence':'SYNTHETIC'}])
+        if status=='corrected':
+            review['output_claims'].append({'claim_id':'o3','text':'blue cat','label':'supported','kind':'attribute','origin':'correction','baseline_claim_id':'c1','evidence':'SYNTHETIC'})
+&gt;       with pytest.raises(AuditError, match='persist|inventory|contradict'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;
+
+tests/test_audit_regressions.py:57: Failed</failure></testcase><testcase classname="tests.test_pipeline" name="test_review_rejects_duplicate_or_relabelled_outputs[duplicate_job]" time="0.313"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;">synthetic_plan = (Config(raw={'schema_version': 1, 'project_root': '..', 'phase2_zip': 'assets/Brain-Imager_Phase-2_reproducibility_202...d': 'attribute', ...}, {'claim_id': 'c2', 'end': 9, 'evidence': 'SYNTHETIC TEST ONLY', 'kind': 'object', ...}], ...}]})
+change = 'duplicate_job'
+
+    @pytest.mark.parametrize('change', ['duplicate_job', 'decoder_identity'])
+    def test_review_rejects_duplicate_or_relabelled_outputs(synthetic_plan, change):
+        cfg,plan,pre=synthetic_plan
+        execution.execute_plan(cfg,True,provider_factory=SyntheticProvider)
+        path=cfg.study/'outputs.jsonl';rows=load_jsonl(path)
+        if change=='duplicate_job':rows.append(copy.deepcopy(rows[0]))
+        else:rows[0]['decoder']='fabricated-variant'
+        save_jsonl(path,rows)
+&gt;       with pytest.raises(AuditError,match='duplicate|provenance|identity'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;
+
+tests/test_pipeline.py:120: Failed</failure></testcase><testcase classname="tests.test_pipeline" name="test_review_rejects_duplicate_or_relabelled_outputs[decoder_identity]" time="0.014"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;">synthetic_plan = (Config(raw={'schema_version': 1, 'project_root': '..', 'phase2_zip': 'assets/Brain-Imager_Phase-2_reproducibility_202...d': 'attribute', ...}, {'claim_id': 'c2', 'end': 9, 'evidence': 'SYNTHETIC TEST ONLY', 'kind': 'object', ...}], ...}]})
+change = 'decoder_identity'
+
+    @pytest.mark.parametrize('change', ['duplicate_job', 'decoder_identity'])
+    def test_review_rejects_duplicate_or_relabelled_outputs(synthetic_plan, change):
+        cfg,plan,pre=synthetic_plan
+        execution.execute_plan(cfg,True,provider_factory=SyntheticProvider)
+        path=cfg.study/'outputs.jsonl';rows=load_jsonl(path)
+        if change=='duplicate_job':rows.append(copy.deepcopy(rows[0]))
+        else:rows[0]['decoder']='fabricated-variant'
+        save_jsonl(path,rows)
+&gt;       with pytest.raises(AuditError,match='duplicate|provenance|identity'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.common.AuditError'&gt;
+
+tests/test_pipeline.py:120: Failed</failure></testcase><testcase classname="tests.test_provider_and_budget" name="test_unexpected_returned_model_is_not_accepted" time="0.001"><failure message="Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.provider.ProviderFailure'&gt;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x7fc5f892eab0&gt;
+
+    def test_unexpected_returned_model_is_not_accepted(monkeypatch):
+        monkeypatch.setenv('TEST_ONLY_API_KEY','synthetic-not-a-real-key')
+        raw=response();raw['model']='different-unplanned-model'
+        with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,json=raw))) as client:
+&gt;           with pytest.raises(ProviderFailure,match='model'):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE &lt;class 'brain_imager_phase3.provider.ProviderFailure'&gt;
+
+tests/test_provider_and_budget.py:76: Failed</failure></testcase></testsuite></testsuites>

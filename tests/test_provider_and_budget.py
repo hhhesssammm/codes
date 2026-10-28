@@ -68,3 +68,10 @@ def test_payload_never_contains_oracle_metadata():
     assert set(user)=={'source_caption','other_image_caption_examples'}
     assert not any(k in json.dumps(b) for k in ['nsd_id','reference_caption','focal_claim_id','repaired_query','crop_filename'])
     assert cost_reservation(b,MODEL)['reserved_usd']>0
+
+def test_unexpected_returned_model_is_not_accepted(monkeypatch):
+    monkeypatch.setenv('TEST_ONLY_API_KEY','synthetic-not-a-real-key')
+    raw=response();raw['model']='different-unplanned-model'
+    with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,json=raw))) as client:
+        with pytest.raises(ProviderFailure,match='model'):
+            OpenAIProvider(MODEL,client).generate(request_body(MODEL,'caption',''),'synthetic')

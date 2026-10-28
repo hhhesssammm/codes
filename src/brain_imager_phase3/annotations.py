@@ -1,6 +1,7 @@
 """Human evidence is required. Templates deliberately contain no inferred truth labels."""
 from __future__ import annotations
 from pathlib import Path
+from .assets import validate_phase2
 from .common import digest, load_json, load_jsonl, require, save_json, save_jsonl, sha_bytes, sha_file, unique
 from .selection import pilot_rows, load_selection
 
@@ -13,10 +14,20 @@ TRANSITIONS = {
 }
 
 def crop_registry(cfg):
+    validate_phase2(cfg)
     receipts = load_json(cfg.study / "crop_receipts.json")
     out = unique(receipts, "coco_image_id")
     require(set(out) == set(load_selection(cfg)["coco_image_ids"]), "Crop receipts do not cover the frozen pilot")
+    samples = unique(load_jsonl(cfg.phase2 / "results/sample_manifest.jsonl"), "coco_image_id")
+    prior = {r["coco_image_id"]: r for r in load_json(cfg.phase2 / "results/crop_checks.json")["checks"]}
     for r in receipts:
+        s = samples.get(r["coco_image_id"])
+        require(s is not None and r.get("filename") == s["official_png_name"]
+                and r.get("url") == s["official_png_url"]
+                and r.get("nsd_id_zero_based") == s["nsd_id_zero_based"],
+                "Crop receipt identity/provenance differs from the official sample mapping")
+        if r["coco_image_id"] in prior:
+            require(r["sha256"] == prior[r["coco_image_id"]]["file_sha256"], "Crop receipt differs from the Phase 2 image hash")
         require(sha_file(cfg.work / "crops" / r["filename"]) == r["sha256"], "Official crop bytes changed")
     return out
 
@@ -49,6 +60,8 @@ def validate_pre_record(a, row, crop):
         require(isinstance(c["start"], int) and isinstance(c["end"], int) and 0 <= c["start"] < c["end"] <= len(row["caption"]), "Claim span is outside the source caption")
         require(bool(c.get("evidence", "").strip()), "Record crop-grounded evidence or uncertainty for every claim")
     focal = a.get("focal_claim_id")
+    if "diagnostic_eligible" in a:
+        require(a["diagnostic_eligible"] is (focal is not None), "Diagnostic eligibility differs from the declared focal error")
     repaired = row["caption"]
     if focal is not None:
         require(focal in claims and claims[focal]["label"] == "contradicted", "Focal error must be a visually contradicted baseline claim")
@@ -123,6 +136,16 @@ def validate_review(a, task, pre):
         require(a["caption_usable"] is False, "A usable caption must have at least one output claim")
     for cid, t in transitions.items():
         linked = [c for c in outclaims.values() if c.get("baseline_claim_id") == cid]
+        if base[cid]["label"] == "contradicted":
+            persists = any(c["origin"] == "baseline" and c["label"] == "contradicted" for c in linked)
+            if persists:
+                require(t["status"] == "persisted", "Output inventory still asserts the baseline error; it must be scored as persisted")
+            if t["status"] == "omitted":
+                require(not any(c["origin"] == "correction" and c["label"] == "supported" for c in linked),
+                        "Output inventory contains an explicit supported correction, not mere omission")
+        if base[cid]["label"] == "supported" and t["status"] == "omitted":
+            require(not any(c["origin"] == "baseline" and c["label"] == "supported" for c in linked),
+                    "Output inventory retains a supported baseline claim marked omitted")
         if t["status"] == "corrected":
             require(any(c["origin"] == "correction" and c["label"] == "supported" for c in linked), "Explicit correction requires a supported replacement claim linked to the original error")
         if t["status"] == "persisted":

@@ -6,6 +6,10 @@ caption, and whether repairing only the retrieval query changes that persistence
 
 **Start with [WINDOWS_GUIDE.md](WINDOWS_GUIDE.md).** It contains exact PowerShell
 commands, setup, annotation, cost controls, pilot execution and troubleshooting.
+For the reviewed **0.1.1** update, use [review/LAPTOP_UPDATE.md](review/LAPTOP_UPDATE.md)
+first. [review/REVIEW_REPORT.md](review/REVIEW_REPORT.md) records the bugs,
+actual validation and offline chunk-representation comparison; every changed
+file is listed in [review/CHANGELOG_FILES.md](review/CHANGELOG_FILES.md).
 See [PROTOCOL.md](PROTOCOL.md) for the scientific estimands and limitations,
 [ANNOTATION_GUIDE.md](ANNOTATION_GUIDE.md) for human review, and
 [INSPECTION_AND_VALIDATION.md](INSPECTION_AND_VALIDATION.md) for actual validation.
@@ -59,3 +63,8 @@ The project uses public cached decoder outputs, not an independently reproduced
 Brain-Imager checkpoint. Original checkpoint hashes and historical Brain-Imager
 pre/post-rewrite pairs remain unavailable. Passing the tests does not establish
 the research hypothesis or validate human labels.
+
+`retrieval-audit` is a separate CPU-only donor-caption diagnostic. It compares
+whole captions, unindexed metadata, short word chunks and same-image bundles
+without changing the production retriever or the seven experimental conditions.
+Its same-image retrieval scores are not factuality results for decoded captions.

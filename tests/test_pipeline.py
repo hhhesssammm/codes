@@ -108,3 +108,14 @@ def test_missing_reviews_do_not_silently_drop_rows(synthetic_plan):
     result=evaluation.make_review(cfg,'R1');p=Path(result['review_file'])
     save_jsonl(p,load_jsonl(p)[:-1])
     with pytest.raises(AuditError,match='every task'):evaluation.validated_reviews(cfg,p)
+
+@pytest.mark.parametrize('change', ['duplicate_job', 'decoder_identity'])
+def test_review_rejects_duplicate_or_relabelled_outputs(synthetic_plan, change):
+    cfg,plan,pre=synthetic_plan
+    execution.execute_plan(cfg,True,provider_factory=SyntheticProvider)
+    path=cfg.study/'outputs.jsonl';rows=load_jsonl(path)
+    if change=='duplicate_job':rows.append(copy.deepcopy(rows[0]))
+    else:rows[0]['decoder']='fabricated-variant'
+    save_jsonl(path,rows)
+    with pytest.raises(AuditError,match='duplicate|provenance|identity'):
+        evaluation.make_review(cfg,'R1')
